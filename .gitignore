@@ -1,0 +1,15 @@
+# backend
+backend/target/
+backend/.idea/
+backend/*.iml
+
+# frontend
+frontend/node_modules/
+frontend/.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
