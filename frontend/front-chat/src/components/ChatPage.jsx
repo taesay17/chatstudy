@@ -32,17 +32,14 @@ const ChatPage = () => {
   const chatBoxRef = useRef(null);
   const [stompClient, setStompClient] = useState(null);
 
-  // ✅ file upload state
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
-  // ✅ open file chooser
   const handleFilePick = () => {
     if (uploading) return;
     fileInputRef.current?.click();
   };
 
-  // ✅ upload file and send FILE message
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -86,7 +83,6 @@ const ChatPage = () => {
     }
   };
 
-  // ✅ load messages
   useEffect(() => {
     async function loadMessages() {
       try {
@@ -100,7 +96,6 @@ const ChatPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ auto scroll
   useEffect(() => {
     if (chatBoxRef.current) {
       chatBoxRef.current.scroll({
@@ -110,7 +105,6 @@ const ChatPage = () => {
     }
   }, [messages]);
 
-  // ✅ connect websocket & subscribe
   useEffect(() => {
     const connectWebSocket = () => {
       const sock = new SockJS(`${baseURL}/chat`);
@@ -132,7 +126,6 @@ const ChatPage = () => {
     }
   }, [roomId, connected]);
 
-  // ✅ send text message
   const sendMessage = async () => {
     if (stompClient && connected && input.trim()) {
       const message = {
