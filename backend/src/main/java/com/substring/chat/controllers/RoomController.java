@@ -16,15 +16,16 @@ import org.springframework.data.domain.Pageable;
 
 @RestController
 @RequestMapping("/api/v1/rooms")
-@CrossOrigin("http://localhost:5174")
+@CrossOrigin("http://localhost:*")
 public class RoomController {
 
     private RoomRepository roomRepository;
     private MessageRepository messageRepository;
 
 
-    public RoomController(RoomRepository roomRepository) {
+    public RoomController(RoomRepository roomRepository, MessageRepository messageRepository) {
         this.roomRepository = roomRepository;
+        this.messageRepository = messageRepository;
     }
 
     //create room

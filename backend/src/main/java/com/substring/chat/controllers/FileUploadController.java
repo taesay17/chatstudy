@@ -14,7 +14,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/files")
-@CrossOrigin(origins = {"http://localhost:5173","http://localhost:5174"})
+@CrossOrigin("http://localhost:*")
 public class FileUploadController {
 
     private final String uploadDir = "uploads";

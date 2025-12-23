@@ -1,5 +1,6 @@
 package com.substring.chat.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -35,6 +36,7 @@ public class Message {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_fk", nullable = false)
+    @JsonIgnore
     private Room room;
 
 

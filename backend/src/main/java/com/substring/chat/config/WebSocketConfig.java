@@ -10,26 +10,16 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-
         config.enableSimpleBroker("/topic");
-        // /topic/messages
-
         config.setApplicationDestinationPrefixes("/app");
-        // /app/chat
-        // server-side: @MessagingMapping("/chat)
-
-
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/chat")
-                .setAllowedOrigins("http://localhost:5173", "http://localhost:5176", "http://localhost:5177")
+                .setAllowedOriginPatterns("http://localhost:*")
                 .withSockJS();
-
     }
-    // /chat endpoint par connection apka establish hoga
 }

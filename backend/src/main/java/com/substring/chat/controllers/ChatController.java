@@ -3,6 +3,7 @@ package com.substring.chat.controllers;
 import com.substring.chat.entities.Message;
 import com.substring.chat.entities.Room;
 import com.substring.chat.playload.MessageRequest;
+import com.substring.chat.repositories.MessageRepository;
 import com.substring.chat.repositories.RoomRepository;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -14,45 +15,41 @@ import org.springframework.web.bind.annotation.RequestBody;
 import java.time.LocalDateTime;
 
 @Controller
-@CrossOrigin("http://localhost:5174")
+@CrossOrigin("http://localhost:*")
 public class ChatController {
 
 
-    private RoomRepository roomRepository;
+    private final RoomRepository roomRepository;
+    private final MessageRepository messageRepository;
 
-    public ChatController(RoomRepository roomRepository) {
+    public ChatController(RoomRepository roomRepository, MessageRepository messageRepository) {
         this.roomRepository = roomRepository;
+        this.messageRepository = messageRepository;
     }
 
 
-    //for sending and receiving messages
-    @MessageMapping("/sendMessage/{roomId}")// /app/sendMessage/roomId
-    @SendTo("/topic/room/{roomId}")//subscribe
-    public Message sendMessage(
-            @DestinationVariable String roomId,
-            @RequestBody MessageRequest request
-    ) {
+    @MessageMapping("/sendMessage/{roomId}")
+    @SendTo("/topic/room/{roomId}")
+    public Message sendMessage(@DestinationVariable String roomId, MessageRequest request) {
 
-        Room room = roomRepository.findByRoomId(request.getRoomId());
+        Room room = roomRepository.findByRoomId(roomId);
+        if (room == null) throw new RuntimeException("room not found !!");
 
         Message message = new Message();
-        message.setContent(request.getContent());
         message.setSender(request.getSender());
-        message.setType(request.getType());
-        message.setFileUrl(request.getFileUrl());
+        message.setContent(request.getContent());
+        message.setType(request.getType());       // TEXT/FILE
+        message.setFileUrl(request.getFileUrl()); // null для TEXT
         message.setTimeStamp(LocalDateTime.now());
 
-        if (room != null) {
-            message.setRoom(room);        // ✅ важно для связи
-            room.getMessages().add(message);
-            roomRepository.save(room);
-        } else {
-            throw new RuntimeException("room not found !!");
-        }
+        message.setRoom(room); // ✅ связь
 
-        return message;
-
-
-
+        Message saved = messageRepository.save(message); // ✅ сохраняем message
+        return saved; // ✅ вернётся без room (из-за @JsonIgnore)
     }
+
+
+
+
+
 }
