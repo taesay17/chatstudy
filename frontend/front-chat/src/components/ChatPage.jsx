@@ -2,7 +2,12 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { clearAuth, getRole, getUsername } from "../utils/AuthStorage";
-import { getMessagesApi, sendTextApi, uploadFileApi } from "../services/MessageService";
+import {
+  getMessagesApi,
+  sendTextApi,
+  uploadFileApi,
+} from "../services/MessageService";
+import { getMembersApi, removeMemberApi } from "../services/RoomService";
 
 const ChatPage = () => {
   const navigate = useNavigate();
@@ -15,9 +20,24 @@ const ChatPage = () => {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+
   const logout = () => {
     clearAuth();
     navigate("/auth");
+  };
+
+  const loadMembers = async () => {
+    try {
+      setMembersLoading(true);
+      const data = await getMembersApi(roomId);
+      setMembers(Array.isArray(data) ? data : []);
+    } catch (e) {
+      toast.error(e.response?.data || "Failed to load members");
+    } finally {
+      setMembersLoading(false);
+    }
   };
 
   const loadMessages = async () => {
@@ -28,6 +48,20 @@ const ChatPage = () => {
       toast.error(e.response?.data || "Failed to load messages");
     }
   };
+
+  const removeMember = async (u) => {
+    try {
+      await removeMemberApi(roomId, u);
+      toast.success("Removed");
+      loadMembers();
+    } catch (e) {
+      toast.error(e.response?.data || "Remove failed");
+    }
+  };
+
+  useEffect(() => {
+    loadMembers();
+  }, [roomId]);
 
   useEffect(() => {
     loadMessages();
@@ -57,7 +91,7 @@ const ChatPage = () => {
       setSending(true);
       await uploadFileApi(roomId, username, file);
       toast.success("File sent");
-      e.target.value = ""; // чтобы можно было выбрать тот же файл снова
+      e.target.value = "";
       await loadMessages();
     } catch (err) {
       toast.error(err.response?.data || "Upload failed");
@@ -67,7 +101,7 @@ const ChatPage = () => {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
           <div className="text-lg font-semibold">Chat room: {roomId}</div>
@@ -81,59 +115,103 @@ const ChatPage = () => {
         </button>
       </div>
 
-      <div className="mt-6 p-4 rounded dark:bg-gray-800 h-[420px] overflow-y-auto flex flex-col gap-3">
-        {messages.length === 0 && <div className="opacity-70">No messages yet.</div>}
+      {/* ✅ Layout: Members left, Chat right */}
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Members */}
+        <div className="md:col-span-1 p-4 rounded dark:bg-gray-800">
+          <div className="font-semibold mb-2">Participants</div>
 
-        {messages.map((m) => (
-  <div key={m.id} className="bg-black/20 rounded p-3">
-    <div className="text-sm opacity-80">
-      {m.sender || "unknown"}
-      {" • "}
-      {m.timeStamp && new Date(m.timeStamp).toLocaleString()} {/* ✅ вот тут */}
-    </div>
+          {membersLoading && (
+            <div className="opacity-70 text-sm">Loading...</div>
+          )}
 
-    {m.type === "FILE" ? (
-      <div className="mt-1">
-        <div className="opacity-80 text-sm">{m.fileName}</div>
-        <a
-          className="underline"
-          href={`http://localhost:8080${m.fileUrl}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open file
-        </a>
-      </div>
-    ) : (
-      <div className="mt-1">{m.content}</div>
-    )}
-  </div>
-))}
+          {!membersLoading && members.length === 0 && (
+            <div className="opacity-70 text-sm">No participants</div>
+          )}
 
-      </div>
+          <div className="flex flex-col gap-2">
+            {members.map((m) => (
+              <div
+                key={m.username}
+                className="flex items-center justify-between bg-black/20 rounded px-3 py-2"
+              >
+                <div className="text-sm">
+                  <div className="font-medium">{m.username}</div>
+                  <div className="opacity-70">{m.role}</div>
+                </div>
 
-      <div className="mt-4 flex gap-2 items-center">
-        <input
-          className="flex-1 p-3 rounded dark:bg-gray-700"
-          placeholder="Type message..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendText()}
-          disabled={sending}
-        />
+                {role === "TEACHER" && m.username !== username && (
+                  <button
+                    className="px-3 py-1 rounded dark:bg-red-600 text-sm"
+                    onClick={() => removeMember(m.username)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
-        <label className="px-4 py-3 rounded dark:bg-gray-600 cursor-pointer">
-          File
-          <input type="file" className="hidden" onChange={onPickFile} />
-        </label>
+        {/* Chat */}
+        <div className="md:col-span-2 flex flex-col gap-3">
+          {/* Messages */}
+          <div className="p-4 rounded dark:bg-gray-800 h-[420px] overflow-y-auto flex flex-col gap-3">
+            {messages.length === 0 && (
+              <div className="opacity-70">No messages yet.</div>
+            )}
 
-        <button
-          className="px-4 py-3 rounded dark:bg-blue-600"
-          onClick={sendText}
-          disabled={sending}
-        >
-          Send
-        </button>
+            {messages.map((m) => (
+              <div key={m.id} className="bg-black/20 rounded p-3">
+                <div className="text-sm opacity-80">
+                  {m.sender || "unknown"} {" • "}
+                  {m.timeStamp && new Date(m.timeStamp).toLocaleString()}
+                </div>
+
+                {m.type === "FILE" ? (
+                  <div className="mt-1">
+                    <div className="opacity-80 text-sm">{m.fileName}</div>
+                    <a
+                      className="underline"
+                      href={`http://localhost:8080${m.fileUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open file
+                    </a>
+                  </div>
+                ) : (
+                  <div className="mt-1">{m.content}</div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Input */}
+          <div className="flex gap-2 items-center">
+            <input
+              className="flex-1 p-3 rounded dark:bg-gray-700"
+              placeholder="Type message..."
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendText()}
+              disabled={sending}
+            />
+
+            <label className="px-4 py-3 rounded dark:bg-gray-600 cursor-pointer">
+              File
+              <input type="file" className="hidden" onChange={onPickFile} />
+            </label>
+
+            <button
+              className="px-4 py-3 rounded dark:bg-blue-600"
+              onClick={sendText}
+              disabled={sending}
+            >
+              Send
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
