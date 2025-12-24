@@ -3,6 +3,7 @@ import { loginApi, registerApi } from "../services/AuthService";
 import useChatContext from "../context/ChatContext";
 import { useNavigate } from "react-router";
 import toast from "react-hot-toast";
+import { saveAuth } from "../utils/AuthStorage";
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -21,12 +22,12 @@ const AuthPage = () => {
 
   const submit = async () => {
     try {
-      const data = isLogin
-        ? await loginApi(form)
-        : await registerApi(form);
+      const data = isLogin ? await loginApi(form) : await registerApi(form);
+
+      // ✅ сохраняем token+role+username
+      saveAuth(data);
 
       toast.success(isLogin ? "Logged in" : "Registered");
-
       setCurrentUser(data.username);
       setConnected(true);
       navigate("/");
@@ -49,6 +50,7 @@ const AuthPage = () => {
           onChange={handleChange}
           className="p-2 rounded dark:bg-gray-700"
         />
+
         <input
           name="password"
           type="password"
@@ -70,10 +72,7 @@ const AuthPage = () => {
           </select>
         )}
 
-        <button
-          onClick={submit}
-          className="dark:bg-blue-600 py-2 rounded"
-        >
+        <button onClick={submit} className="dark:bg-blue-600 py-2 rounded">
           {isLogin ? "Login" : "Register"}
         </button>
 
@@ -81,9 +80,7 @@ const AuthPage = () => {
           onClick={() => setIsLogin(!isLogin)}
           className="text-sm text-center underline cursor-pointer"
         >
-          {isLogin
-            ? "No account? Register"
-            : "Already have account? Login"}
+          {isLogin ? "No account? Register" : "Already have account? Login"}
         </p>
       </div>
     </div>

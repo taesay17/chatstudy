@@ -1,144 +1,81 @@
-import React, { useState } from "react";
-import chatIcon from "../assets/chat.png";
+import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { createRoomApi, joinChatApi } from "../services/RoomService";
-import useChatContext from "../context/ChatContext";
-import { useNavigate } from "react-router";
-const JoinCreateChat = () => {
-  const [detail, setDetail] = useState({
-    roomId: "",
-    userName: "",
-  });
+import { createRoomApi, getRoomsApi, joinRoomApi } from "../services/RoomService";
+import { getRole } from "../utils/AuthStorage";
 
-  const { roomId, userName, setRoomId, setCurrentUser, setConnected } =
-    useChatContext();
-  const navigate = useNavigate();
+const JoinCreatePage = () => {
+  const [rooms, setRooms] = useState([]);
+  const [name, setName] = useState("");
+  const role = getRole(); // "TEACHER" или "STUDENT"
 
-  function handleFormInputChange(event) {
-    setDetail({
-      ...detail,
-      [event.target.name]: event.target.value,
-    });
-  }
-
-  function validateForm() {
-    if (detail.roomId === "" || detail.userName === "") {
-      toast.error("Invalid Input !!");
-      return false;
+  const load = async () => {
+    try {
+      const data = await getRoomsApi();
+      setRooms(data);
+    } catch (e) {
+      toast.error(e.response?.data || "Failed to load rooms");
     }
-    return true;
-  }
+  };
 
-  async function joinChat() {
-    if (validateForm()) {
-      //join chat
+  useEffect(() => {
+    load();
+  }, []);
 
-      try {
-        const room = await joinChatApi(detail.roomId);
-        toast.success("joined..");
-        setCurrentUser(detail.userName);
-        setRoomId(room.roomId);
-        setConnected(true);
-        navigate("/chat");
-      } catch (error) {
-        if (error.status == 400) {
-          toast.error(error.response.data);
-        } else {
-          toast.error("Error in joining room");
-        }
-        console.log(error);
-      }
+  const createRoom = async () => {
+    if (!name.trim()) return toast.error("Room name is empty");
+    try {
+      await createRoomApi(name);
+      toast.success("Room created");
+      setName("");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data || "Create room failed");
     }
-  }
+  };
 
-  async function createRoom() {
-    if (validateForm()) {
-      //create room
-      console.log(detail);
-      // call api to create room on backend
-      try {
-        const response = await createRoomApi(detail.roomId);
-        console.log(response);
-        toast.success("Room Created Successfully !!");
-        //join the room
-        setCurrentUser(detail.userName);
-        setRoomId(response.roomId);
-        setConnected(true);
-
-        navigate("/chat");
-
-        //forward to chat page...
-      } catch (error) {
-        console.log(error);
-        if (error.status == 400) {
-          toast.error("Room  already exists !!");
-        } else {
-          toast("Error in creating room");
-        }
-      }
+  const join = async (roomId) => {
+    try {
+      await joinRoomApi(roomId);
+      toast.success("Joined");
+      // тут можешь navigate(`/chat/${roomId}`) если у тебя есть такие роуты
+    } catch (e) {
+      toast.error(e.response?.data || "Join failed");
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center ">
-      <div className="p-10 dark:border-gray-700 border w-full flex flex-col gap-5 max-w-md rounded dark:bg-gray-900 shadow">
-        <div>
-          <img src={chatIcon} className="w-24 mx-auto" />
-        </div>
+    <div className="p-6 flex flex-col gap-4">
+      <h1 className="text-xl font-semibold">Rooms</h1>
 
-        <h1 className="text-2xl font-semibold text-center ">
-          Join Room / Create Room ..
-        </h1>
-        {/* name div */}
-        <div className="">
-          <label htmlFor="name" className="block font-medium mb-2">
-            Your name
-          </label>
+      {role === "TEACHER" && (
+        <div className="flex gap-2">
           <input
-            onChange={handleFormInputChange}
-            value={detail.userName}
-            type="text"
-            id="name"
-            name="userName"
-            placeholder="Enter the name"
-            className="w-full dark:bg-gray-600 px-4 py-2 border dark:border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-2 rounded dark:bg-gray-700"
+            placeholder="New room name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
           />
-        </div>
-
-        {/* room id div */}
-        <div className="">
-          <label htmlFor="name" className="block font-medium mb-2">
-            Room ID / New Room ID
-          </label>
-          <input
-            name="roomId"
-            onChange={handleFormInputChange}
-            value={detail.roomId}
-            type="text"
-            id="name"
-            placeholder="Enter the room id"
-            className="w-full dark:bg-gray-600 px-4 py-2 border dark:border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* button  */}
-        <div className="flex justify-center gap-2 mt-4">
-          <button
-            onClick={joinChat}
-            className="px-3 py-2 dark:bg-blue-500 hover:dark:bg-blue-800 rounded-full"
-          >
-            Join Room
-          </button>
-          <button
-            onClick={createRoom}
-            className="px-3 py-2 dark:bg-orange-500 hover:dark:bg-orange-800 rounded-full"
-          >
-            Create Room
+          <button className="px-4 py-2 rounded dark:bg-blue-600" onClick={createRoom}>
+            Create
           </button>
         </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {rooms?.map((r) => (
+          <div key={r.id} className="p-3 rounded dark:bg-gray-800 flex justify-between">
+            <div>
+              <div className="font-semibold">{r.name}</div>
+              <div className="text-sm opacity-80">id: {r.id}</div>
+            </div>
+            <button className="px-3 py-1 rounded dark:bg-green-600" onClick={() => join(r.id)}>
+              Join
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
 
-export default JoinCreateChat;
+export default JoinCreatePage;

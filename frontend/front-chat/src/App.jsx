@@ -1,17 +1,35 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import "./App.css";
-import toast from "react-hot-toast";
+import { Routes, Route } from "react-router-dom";
+import AuthPage from "./components/AuthPage";
+import ChatPage from "./components/ChatPage";
 import JoinCreateChat from "./components/JoinCreateChat";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { Toaster } from "react-hot-toast";
 
-function App() {
-  const [count, setCount] = useState(0);
-
+export default function App() {
   return (
-    <div>
-      <JoinCreateChat />
-    </div>
+    <>
+      <Toaster />
+      <Routes>
+        <Route path="/auth" element={<AuthPage />} />
+
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <JoinCreateChat />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </>
   );
 }
-
-export default App;

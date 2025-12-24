@@ -1,27 +1,18 @@
 import { createContext, useContext, useState } from "react";
 
-const ChatContext = createContext();
+const ChatContext = createContext(null);
 
 export const ChatProvider = ({ children }) => {
-  const [roomId, setRoomId] = useState("");
-  const [currentUser, setCurrentUser] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
   const [connected, setConnected] = useState(false);
 
   return (
-    <ChatContext.Provider
-      value={{
-        roomId,
-        currentUser,
-        connected,
-        setRoomId,
-        setCurrentUser,
-        setConnected,
-      }}
-    >
+    <ChatContext.Provider value={{ currentUser, setCurrentUser, connected, setConnected }}>
       {children}
     </ChatContext.Provider>
   );
 };
 
-const useChatContext = () => useContext(ChatContext);
-export default useChatContext;
+export default function useChatContext() {
+  return useContext(ChatContext);
+}
