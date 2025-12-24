@@ -35,6 +35,9 @@ public class SecurityConfig {
                         // только TEACHER может создавать комнату
                         .requestMatchers(HttpMethod.POST, "/api/v1/rooms").hasRole("TEACHER")
 
+                        .requestMatchers("/uploads/**").permitAll()
+
+
                         .anyRequest().authenticated()
                 )
 

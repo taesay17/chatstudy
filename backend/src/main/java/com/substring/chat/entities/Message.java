@@ -9,6 +9,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import jakarta.persistence.*;
+
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 
@@ -31,8 +33,14 @@ public class Message {
 
     private LocalDateTime timeStamp;
 
+    private String fileName;
+    private String fileContentType;
+
     private String type;
     private String fileUrl;
+
+    private Long fileSize;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_fk", nullable = false)
@@ -46,5 +54,12 @@ public class Message {
         this.sender = sender;
         this.content = content;
         this.timeStamp = LocalDateTime.now();
+    }
+    public Long getFileSize() {
+        return fileSize;
+    }
+
+    public void setFileSize(Long fileSize) {
+        this.fileSize = fileSize;
     }
 }
