@@ -15,3 +15,4 @@ export const joinRoomApi = async (roomId) => {
   const res = await api.get(`/api/v1/rooms/${roomId}`);
   return res.data;
 };
+

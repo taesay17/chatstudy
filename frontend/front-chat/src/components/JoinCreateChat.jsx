@@ -2,11 +2,15 @@ import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { createRoomApi, getRoomsApi, joinRoomApi } from "../services/RoomService";
 import { getRole } from "../utils/AuthStorage";
+import { useNavigate } from "react-router-dom";
+
 
 const JoinCreatePage = () => {
   const [rooms, setRooms] = useState([]);
   const [name, setName] = useState("");
   const role = getRole(); // "TEACHER" или "STUDENT"
+  const navigate = useNavigate();
+
 
   const load = async () => {
     try {
@@ -34,14 +38,16 @@ const JoinCreatePage = () => {
   };
 
   const join = async (roomId) => {
-    try {
-      await joinRoomApi(roomId);
-      toast.success("Joined");
-      // тут можешь navigate(`/chat/${roomId}`) если у тебя есть такие роуты
-    } catch (e) {
-      toast.error(e.response?.data || "Join failed");
-    }
-  };
+  try {
+    await joinRoomApi(roomId);
+    toast.success("Joined");
+    navigate(`/chat/${roomId}`);   // ✅ вот это переносит в чат
+  } catch (e) {
+    toast.error(e.response?.data || "Join failed");
+  }
+};
+
+
 
   return (
     <div className="p-6 flex flex-col gap-4">
@@ -62,17 +68,20 @@ const JoinCreatePage = () => {
       )}
 
       <div className="flex flex-col gap-2">
-        {rooms?.map((r) => (
-          <div key={r.id} className="p-3 rounded dark:bg-gray-800 flex justify-between">
-            <div>
-              <div className="font-semibold">{r.name}</div>
-              <div className="text-sm opacity-80">id: {r.id}</div>
-            </div>
-            <button className="px-3 py-1 rounded dark:bg-green-600" onClick={() => join(r.id)}>
-              Join
-            </button>
-          </div>
-        ))}
+        {rooms.map((r) => (
+  <div key={r.roomId} className="p-3 rounded dark:bg-gray-800 flex justify-between">
+    <div>
+      <div className="font-semibold">{r.roomId}</div>
+    </div>
+    <button
+      className="px-3 py-1 rounded dark:bg-green-600"
+      onClick={() => join(r.roomId)}   // ✅ важно
+    >
+      Join
+    </button>
+  </div>
+))}
+
       </div>
     </div>
   );
