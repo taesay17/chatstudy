@@ -2,11 +2,20 @@ package com.substring.chat.controllers;
 
 import com.substring.chat.entities.Message;
 import com.substring.chat.entities.Room;
+import com.substring.chat.entities.RoomMember;
+import com.substring.chat.entities.User;
+import com.substring.chat.playload.AddMemberRequest;
 import com.substring.chat.playload.CreateRoomRequest;
 import com.substring.chat.playload.SendMessageRequest;
 import com.substring.chat.repositories.MessageRepository;
+import com.substring.chat.repositories.RoomMemberRepository;
 import com.substring.chat.repositories.RoomRepository;
-import lombok.Getter;
+import com.substring.chat.repositories.UserRepository;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.substring.chat.playload.MemberDto;
+import java.util.stream.Collectors;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -32,12 +41,20 @@ public class RoomController {
 
     private RoomRepository roomRepository;
     private MessageRepository messageRepository;
+    private final RoomMemberRepository memberRepository;
+    private final UserRepository userRepository;
+
 
     public RoomController(RoomRepository roomRepository,
-                          MessageRepository messageRepository) {
+                          MessageRepository messageRepository,
+                          RoomMemberRepository memberRepository,
+                          UserRepository userRepository) {
         this.roomRepository = roomRepository;
         this.messageRepository = messageRepository;
+        this.memberRepository = memberRepository;
+        this.userRepository = userRepository;
     }
+
 
     // ✅ GET /api/v1/rooms  -> список комнат
     @GetMapping
@@ -70,9 +87,11 @@ public class RoomController {
 
     // ✅ POST /api/v1/rooms -> создать комнату (только teacher)
     @PostMapping
-    public ResponseEntity<?> createRoom(@RequestBody CreateRoomRequest req) {
+    public ResponseEntity<?> createRoom(@RequestBody String roomId) {
 
-        String roomId = req.getRoomId();
+        if (!hasRole("TEACHER")) {
+            return ResponseEntity.status(403).body("Only TEACHER can create rooms");
+        }
 
         if (roomRepository.findByRoomId(roomId) != null) {
             return ResponseEntity.badRequest().body("Room already exists!");
@@ -80,21 +99,87 @@ public class RoomController {
 
         Room room = new Room();
         room.setRoomId(roomId);
-        roomRepository.save(room);
+        Room savedRoom = roomRepository.save(room);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(room);
+        // ✅ добавить создателя как участника
+        String me = currentUsername();
+        User teacher = userRepository.findByUsername(me).orElse(null);
+        if (teacher != null) {
+            RoomMember rm = new RoomMember();
+            rm.setRoom(savedRoom);
+            rm.setUser(teacher);
+            memberRepository.save(rm);
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedRoom);
     }
+    @GetMapping("/{roomId}/members")
+    public ResponseEntity<?> getMembers(@PathVariable String roomId) {
+        String me = currentUsername();
+        if (me == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        Room room = roomRepository.findByRoomId(roomId);
+        if (room == null) return ResponseEntity.badRequest().body("Room not found");
+
+        boolean isMember = memberRepository.existsByRoom_RoomIdAndUser_Username(roomId, me);
+        if (!isMember && !hasRole("TEACHER")) {
+            return ResponseEntity.status(403).body("You are not a participant of this room");
+        }
+
+        var members = memberRepository.findByRoom_RoomId(roomId).stream()
+                .map(m -> new MemberDto(m.getUser().getUsername(), m.getUser().getRole().name()))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(members);
+    }
+    @DeleteMapping("/{roomId}/members/{username}")
+    public ResponseEntity<?> removeMember(@PathVariable String roomId,
+                                          @PathVariable String username) {
+
+        if (!hasRole("TEACHER")) {
+            return ResponseEntity.status(403).body("Only TEACHER can remove participants");
+        }
+
+        Room room = roomRepository.findByRoomId(roomId);
+        if (room == null) return ResponseEntity.badRequest().body("Room not found");
+
+        if (!memberRepository.existsByRoom_RoomIdAndUser_Username(roomId, username)) {
+            return ResponseEntity.badRequest().body("User is not in this room");
+        }
+
+        // (опционально) запретить удалять себя
+        String me = currentUsername();
+        if (me != null && me.equals(username)) {
+            return ResponseEntity.badRequest().body("You cannot remove yourself");
+        }
+
+        memberRepository.deleteByRoom_RoomIdAndUser_Username(roomId, username);
+        return ResponseEntity.ok("Removed: " + username);
+    }
+
+
+
 
 
     // join room
     @GetMapping("/{roomId}")
     public ResponseEntity<?> joinRoom(@PathVariable String roomId) {
+        String me = currentUsername();
+        if (me == null) return ResponseEntity.status(401).body("Unauthorized");
+
         Room room = roomRepository.findByRoomId(roomId);
-        if (room == null) {
-            return ResponseEntity.badRequest().body("Room not found!!"); // 👈 400
+        if (room == null) return ResponseEntity.badRequest().body("Room not found!!");
+
+        boolean isMember = memberRepository.existsByRoom_RoomIdAndUser_Username(roomId, me);
+
+        // TEACHER можно разрешить входить в любую комнату
+        if (!isMember && !hasRole("TEACHER")) {
+            return ResponseEntity.status(403).body("You are not a participant of this room");
         }
+
         return ResponseEntity.ok(room);
     }
+
 
 
     // messages
@@ -165,4 +250,64 @@ public class RoomController {
                     .body("Upload failed: " + e.getMessage());
         }
     }
+    @PostMapping("/{roomId}/members")
+    public ResponseEntity<?> addMember(@PathVariable String roomId,
+                                       @RequestBody AddMemberRequest req) {
+
+        if (!hasRole("TEACHER")) {
+            return ResponseEntity.status(403).body("Only TEACHER can add participants");
+        }
+
+        Room room = roomRepository.findByRoomId(roomId);
+        if (room == null) return ResponseEntity.badRequest().body("Room not found!!");
+
+        if (req.getUsername() == null || req.getUsername().isBlank()) {
+            return ResponseEntity.badRequest().body("Username is required");
+        }
+
+        User u = userRepository.findByUsername(req.getUsername()).orElse(null);
+        if (u == null) return ResponseEntity.badRequest().body("User not found");
+
+        if (memberRepository.existsByRoom_RoomIdAndUser_Username(roomId, u.getUsername())) {
+            return ResponseEntity.badRequest().body("User already in room");
+        }
+
+        RoomMember rm = new RoomMember();
+        rm.setRoom(room);
+        rm.setUser(u);
+        memberRepository.save(rm);
+
+        return ResponseEntity.ok("Added: " + u.getUsername());
+    }
+
+    @GetMapping("/my")
+    public ResponseEntity<?> getMyRooms() {
+        String me = currentUsername();
+        if (me == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        // TEACHER видит все комнаты (если хочешь) — можно оставить так
+        if (hasRole("TEACHER")) {
+            return ResponseEntity.ok(roomRepository.findAll());
+        }
+
+        // STUDENT видит только те, где он участник
+        var memberships = memberRepository.findByUser_Username(me);
+        var rooms = memberships.stream().map(RoomMember::getRoom).toList();
+        return ResponseEntity.ok(rooms);
+    }
+
+
+    private String currentUsername() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        return a == null ? null : a.getName();
+    }
+
+    private boolean hasRole(String roleName) {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        if (a == null) return false;
+        return a.getAuthorities().stream()
+                .anyMatch(x -> x.getAuthority().equals("ROLE_" + roleName));
+    }
+
+
 }

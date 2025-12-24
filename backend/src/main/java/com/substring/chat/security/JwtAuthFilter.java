@@ -1,6 +1,7 @@
 package com.substring.chat.security;
 
 import com.substring.chat.service.CustomUserDetailsService;
+import io.jsonwebtoken.Jwts;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -34,6 +35,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (auth != null && auth.startsWith("Bearer ")) {
             String token = auth.substring(7);
             try {
+                if (!jwtService.isTokenValid(token)) {
+                    chain.doFilter(request, response);
+                    return;
+                }
+
                 String username = jwtService.extractUsername(token);
 
                 if (username != null &&
@@ -57,5 +63,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         chain.doFilter(request, response);
     }
+
+
 
 }

@@ -28,18 +28,16 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
-
-                        // любой залогиненный может смотреть комнаты
-                        .requestMatchers(HttpMethod.GET, "/api/v1/rooms/**").authenticated()
-
-                        // только TEACHER может создавать комнату
-                        .requestMatchers(HttpMethod.POST, "/api/v1/rooms").hasRole("TEACHER")
-
                         .requestMatchers("/uploads/**").permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rooms/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/rooms/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/rooms/**").authenticated()
 
                         .anyRequest().authenticated()
                 )
+
+
 
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
