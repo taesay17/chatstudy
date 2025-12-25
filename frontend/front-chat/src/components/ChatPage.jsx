@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { clearAuth, getRole, getUsername } from "../utils/AuthStorage";
@@ -22,6 +22,25 @@ const ChatPage = () => {
 
   const [members, setMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const audioRef = useRef(null);
+  const processedIdsRef = useRef(new Set());
+
+  // Unlock audio playback on first user interaction to satisfy browser autoplay policies
+  useEffect(() => {
+    const unlock = () => {
+      try {
+        if (!audioRef.current) audioRef.current = new Audio('/notification.mp3');
+        // try to play and immediately pause to allow future plays without gesture
+        audioRef.current.play?.().then(() => audioRef.current.pause()).catch(() => {});
+      } catch (e) {
+        // ignore
+      }
+      document.removeEventListener('click', unlock);
+    };
+
+    document.addEventListener('click', unlock, { once: true });
+    return () => document.removeEventListener('click', unlock);
+  }, []);
 
   const logout = () => {
     clearAuth();
@@ -43,7 +62,36 @@ const ChatPage = () => {
   const loadMessages = async () => {
     try {
       const data = await getMessagesApi(roomId, 0, 50);
-      setMessages(Array.isArray(data) ? data.slice().reverse() : []);
+      const fetched = Array.isArray(data) ? data.slice().reverse() : [];
+
+      // If this is the first load (no processed IDs yet), treat fetched messages as history
+      // and mark them as processed without playing sounds.
+      if (processedIdsRef.current.size === 0) {
+        fetched.forEach((m) => m.id && processedIdsRef.current.add(m.id));
+        setMessages(fetched);
+        return;
+      }
+
+      // Find messages we haven't processed yet (new incoming messages)
+      const incoming = fetched.filter(
+        (m) => m.id && !processedIdsRef.current.has(m.id) && m.sender && m.sender !== username
+      );
+
+      if (incoming.length > 0) {
+        // Play once per incoming message. Use same audio instance but reset time.
+        if (!audioRef.current) audioRef.current = new Audio('/notification.mp3');
+
+        incoming.forEach(() => {
+          try {
+            audioRef.current.currentTime = 0;
+          } catch (e) {}
+          audioRef.current.play?.().catch(() => {});
+        });
+      }
+
+      // Mark all fetched message IDs as processed so we don't replay for them later
+      fetched.forEach((m) => m.id && processedIdsRef.current.add(m.id));
+      setMessages(fetched);
     } catch (e) {
       toast.error(e.response?.data || "Failed to load messages");
     }
